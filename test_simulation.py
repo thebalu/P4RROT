@@ -310,6 +310,21 @@ def test_shared_array():
     fp.test(env)
     assert env['v']==756
 
+def test_shared_stack():
+    shared_stack = SharedStack('mystack', uint32_t, 5)
+    fp = FlowProcessor(
+        istruct=[('x',bool_t),('i',uint32_t),('v',uint32_t)],
+        state=[ shared_stack ],
+        method='MODIFY'
+    )
+    fp\
+    .add(PopFromStack('v','mystack'))
+    
+    s = shared_stack.get_repr()
+    env = {'x':True,'i':4,'v':756,'mystack': s}
+    fp.test(env)
+    assert env['s'][4]==756
+
 
 def test_logger():
     fp = FlowProcessor(
