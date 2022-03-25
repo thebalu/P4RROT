@@ -6,11 +6,12 @@ s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 
 while True:
     a = int(input('a (uint32_t)> '))
-    op = input('op ("+" or "-")> ')
-    b = int(input('b (uint32_t)> '))
+    aa = int(input('aa (uint32_t)> '))
 
-    s.sendto(struct.Struct('!IIB').pack(a,b,ord(op[0])),server_addr)
+    s.sendto(struct.Struct('!II').pack(a,aa),server_addr)
     r,_ = s.recvfrom(256)
-    r = struct.Struct('!I').unpack(r)[0]
-    print('Result:',r)
+    r1 = struct.Struct('!II').unpack(r)[0]
+    r2 = struct.Struct('!II').unpack(r)[1]
+    print('Result1:',r1)
+    print('Result2:',r2)
     print()

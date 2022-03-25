@@ -8,6 +8,8 @@ sudo rm -r test.p4app
 cp -r ../../p4_template.p4app test.p4app
 python3 codegen.py
 
+cp client.py test.p4app/
+
 cd test.p4app
 echo '*' > .gitignore
 bash build.sh > buildlog.txt
