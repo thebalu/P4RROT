@@ -194,7 +194,6 @@ class SharedStack(SharedElement):
         gc.get_decl().writeln('register< {} >({}) {};'.format(self.vtype.get_p4_type(),self.capacity,self.vaname))
         gc.get_decl().writeln('register< {} >(1) {};'.format(uint32_t.get_p4_type(), self.index_name))
         gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.temp_name))
-        gc.get_apply().writeln('{}.write(0,0);'.format(self.index_name))
         return gc
 
     def get_repr(self):
@@ -227,8 +226,8 @@ class PopFromStack(Command):
         v = self.env.get_varinfo(self.value)
         s = self.env.get_varinfo(self.stack)
         gc.get_apply().writeln('{}.read({},0);'.format(self.index_name, self.temp_name))
-        gc.get_apply().writeln('{}.read({},{});'.format(s['handle'],v['handle'], self.temp_name))
         gc.get_apply().writeln('{} = {} - 1;'.format(self.temp_name, self.temp_name))
+        gc.get_apply().writeln('{}.read({},{});'.format(s['handle'],v['handle'], self.temp_name))
         gc.get_apply().writeln('{}.write(0,{});'.format(self.index_name,self.temp_name))
         return gc
 
@@ -259,8 +258,8 @@ class PushToStack(Command):
         s = self.env.get_varinfo(self.stack)
         v = self.env.get_varinfo(self.value)
         gc.get_apply().writeln('{}.read({},0);'.format(self.index_name, self.temp_name))
+        gc.get_apply().writeln('{}.write({},{});'.format(s['handle'],self.temp_name, v['handle']))
         gc.get_apply().writeln('{} = {} + 1;'.format(self.temp_name, self.temp_name))
-        gc.get_apply().writeln('{}.write({},{});'.format(s['handle'],v['handle'], self.temp_name))
         gc.get_apply().writeln('{}.write(0,{});'.format(self.index_name,self.temp_name))
         return gc
 
@@ -270,6 +269,68 @@ class PushToStack(Command):
         # if test_env[self.idx_vname]>=t['type'][2]:
         #     raise Exception('{}[{}] : Value {} is out of range 0..{}'.format(self.target),test_env[self.idx_vname],test_env[self.idx_vname],t['type'][2]-1)
         # test_env[self.target][test_env[self.idx_vname]] = test_env[self.source]
+
+
+class BloomFilter(SharedElement):
+
+    def __init__(self,vname:str,vtype:KnownType,capacity:int):
+        self.vaname = vname
+        self.reg_name = vname + '_register'
+        self.index_name = self.reg_name + '_idx'
+        self.temp_name = self.reg_name + "_temp"
+        self.vtype = vtype
+        self.capacity = capacity
+        self.current_size = 0
+
+    def get_name(self):
+        return self.vaname
+
+    def get_type(self):
+        return (SharedStack,self.vtype,self.capacity)
+
+    def get_generated_code(self):
+        gc = GeneratedCode()
+        gc.get_decl().writeln('#pragma netro reglocked register')
+        gc.get_decl().writeln('register< {} >({}) {};'.format(self.vtype.get_p4_type(), self.capacity, self.reg_name))
+        # gc.get_decl().writeln('register< {} >(1) {};'.format(uint32_t.get_p4_type(), self.index_name))
+        gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.temp_name))
+        return gc
+
+    def get_repr(self):
+        return [None]*self.capacity
+
+class MaybeContains(Command):
+    
+    def __init__(self,result: str, bloom_filter:str,value:str,env=None):
+        self.bloom_filter = bloom_filter
+        self.value = value
+        self.reg_name = self.bloom_filter + '_register'
+        self.index_name = self.bloom_filter + '_idx'
+        self.temp_name = self.bloom_filter + '_temp'
+        self.env = env
+        self.result = result
+        if env!=None:
+            self.check()
+
+    def check(self):
+        True
+        
+    def get_generated_code(self):
+        gc = GeneratedCode()
+        val_to_check = self.env.get_varinfo(self.value)
+        bloom_filter_var = self.env.get_varinfo(self.bloom_filter)
+        gc.get_apply().writeln('hash({}, HashAlgorithm.crc16, (bit<32>) 0, {}, (bit<32>) 1024)'
+                                .format(self.temp_name, val_to_check['handle']))
+        gc.get_apply().writeln('{}.read(result_1, {})'.format(self.reg_name, self.temp_name))
+        gc.get_apply().writeln('if (result_1 != 1)' + '{' + '{} = 0;'.format(self.result) + '}')
+
+        return gc
+
+    def execute(self,test_env):
+        s = self.env.get_varinfo(self.value)
+        # if test_env[self.idx_vname]>=s['type'][2]:
+        #     raise Exception('{}[{}] : Value {} is out of range 0..{}'.format(self.source),test_env[self.idx_vname],test_env[self.idx_vname],s['type'][2]-1)
+        # test_env[self.target] = test_env[self.source][test_env[self.idx_vname]]
 
 
 class Const(SharedElement):
