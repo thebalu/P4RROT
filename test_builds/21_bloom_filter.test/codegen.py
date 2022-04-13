@@ -11,7 +11,7 @@ UID.reset()
 fp = FlowProcessor(
         istruct=[('op', uint8_t), ('x',uint32_t)],
         ostruct=[('b',uint32_t), ('err', bool_t)],
-        locals=[('comp_res',bool_t), ('c',uint8_t)],
+        locals=[('comp_res',bool_t)],
         state=[ BloomFilter('mybloom',uint32_t, 1024), \
                             Const('op_add',uint8_t,ord('a')), \
                             Const('op_rem',uint8_t,ord('r')), \
@@ -19,9 +19,6 @@ fp = FlowProcessor(
     )
 
 fp\
-.add(AssignConst('b', ord('3'))) \
-.add(AssignConst('c',ord('a')))\
-.add(Equals('comp_res', 'op', 'c')) \
 .add(MaybeContains('comp_res', 'mybloom', 'x')) \
 .add(SendBack())
 fs = FlowSelector(

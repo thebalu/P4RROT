@@ -282,6 +282,12 @@ class BloomFilter(SharedElement):
         self.capacity = capacity
         self.current_size = 0
 
+        
+        self.value_check = self.vaname + '_value_check'
+        self.hash_name = self.vaname + '_hash'
+        self.salt_name = self.vaname + '_salt'
+        self.hashres_name = self.vaname + '_result'
+
     def get_name(self):
         return self.vaname
 
@@ -293,7 +299,12 @@ class BloomFilter(SharedElement):
         gc.get_decl().writeln('#pragma netro reglocked register')
         gc.get_decl().writeln('register< {} >({}) {};'.format(self.vtype.get_p4_type(), self.capacity, self.reg_name))
         # gc.get_decl().writeln('register< {} >(1) {};'.format(uint32_t.get_p4_type(), self.index_name))
+        gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.value_check))
+        gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.index_name))
         gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.temp_name))
+        gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.hash_name))
+        gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.salt_name))
+        gc.get_decl().writeln('{} {};'.format(uint32_t.get_p4_type(), self.hashres_name))
         return gc
 
     def get_repr(self):
@@ -304,9 +315,13 @@ class MaybeContains(Command):
     def __init__(self,result: str, bloom_filter:str,value:str,env=None):
         self.bloom_filter = bloom_filter
         self.value = value
+        self.value_check = self.bloom_filter + '_value_check'
         self.reg_name = self.bloom_filter + '_register'
         self.index_name = self.bloom_filter + '_idx'
         self.temp_name = self.bloom_filter + '_temp'
+        self.hash_name = self.bloom_filter + '_hash'
+        self.salt_name = self.bloom_filter + '_salt'
+        self.hashres_name = self.bloom_filter + '_result'
         self.env = env
         self.result = result
         if env!=None:
@@ -319,10 +334,21 @@ class MaybeContains(Command):
         gc = GeneratedCode()
         val_to_check = self.env.get_varinfo(self.value)
         bloom_filter_var = self.env.get_varinfo(self.bloom_filter)
-        gc.get_apply().writeln('hash({}, HashAlgorithm.crc16, (bit<32>) 0, {}, (bit<32>) 1024)'
-                                .format(self.temp_name, val_to_check['handle']))
-        gc.get_apply().writeln('{}.read(result_1, {})'.format(self.reg_name, self.temp_name))
-        gc.get_apply().writeln('if (result_1 != 1)' + '{' + '{} = 0;'.format(self.result) + '}')
+
+        # start with True
+        gc.get_apply().writeln('{} = {};'.format(self.result, '(bit<8>)1'))         
+        # make a copy of the value to check, we'll increase and hash the copy repeatedly
+        gc.get_apply().writeln('{} = {};'.format(self.value_check, val_to_check['handle']))         
+        # a "salt" value, we'll use this to step the copied value, and we'll hash this combined thing       
+        gc.get_apply().writeln('hash({}, HashAlgorithm.crc32, (bit<32>) 0, {}, (bit<32>) 1024);' \
+                        .format(self.salt_name, val_to_check['handle']))
+        # this will be a parameter, how many hashes we want to calculate, now let's use fixed 4
+        for i in range(4):
+            gc.get_apply().writeln('{} = {} + {};'.format(self.value_check, self.value_check, self.salt_name))
+            gc.get_apply().writeln('hash({}, HashAlgorithm.crc16, (bit<32>) 0, {}, (bit<32>) 1024);' \
+                                .format(self.hash_name, self.value_check))
+            gc.get_apply().writeln('{}.read({}, {});'.format(self.reg_name, self.hashres_name, self.hash_name))
+            gc.get_apply().writeln('if ({} != 1)'.format(self.hashres_name) + '{' + '{} = (bit<8>) 0;'.format(self.result) + '};')
 
         return gc
 
