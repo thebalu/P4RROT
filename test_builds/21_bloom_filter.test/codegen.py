@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../../')
-from stateful import Const, BloomFilter, MaybeContains
+from stateful import Const, BloomFilter, MaybeContains, PutIntoBloom
 
 
 from generator_tools import *
@@ -12,13 +12,12 @@ fp = FlowProcessor(
         istruct=[('op', uint8_t), ('x',uint32_t)],
         ostruct=[('b',uint32_t), ('err', bool_t)],
         locals=[('comp_res',bool_t)],
-        state=[ BloomFilter('mybloom',uint32_t, 1024), \
-                            Const('op_add',uint8_t,ord('a')), \
-                            Const('op_rem',uint8_t,ord('r')), \
-                            Const('op_len',uint8_t,ord('l')) ]
+        state=[ BloomFilter('mybloom',uint32_t, 123, 3) ]
     )
 
 fp\
+.add(PutIntoBloom('mybloom', 'x')) \
+.add(Comment('this is a comment')) \
 .add(MaybeContains('comp_res', 'mybloom', 'x')) \
 .add(SendBack())
 fs = FlowSelector(
