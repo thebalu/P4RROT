@@ -10,15 +10,22 @@ from commands import *
 UID.reset()
 fp = FlowProcessor(
         istruct=[('op', uint8_t), ('x',uint32_t)],
-        ostruct=[('b',uint32_t), ('err', bool_t)],
-        locals=[('comp_res',bool_t)],
-        state=[ BloomFilter('mybloom',uint32_t, 123, 3) ]
+        ostruct=[('contains', bool_t), ('err', bool_t)],
+        locals=[('comp_res',bool_t), ('operation', uint8_t)],
+        state=[ BloomFilter('mybloom',uint32_t, 1000, 3) ]
     )
 
 fp\
-.add(PutIntoBloom('mybloom', 'x')) \
-.add(Comment('this is a comment')) \
-.add(MaybeContains('comp_res', 'mybloom', 'x')) \
+.add(AssignConst('operation', ord('a'))) \
+.add(Equals('comp_res', 'op', 'operation')) \
+.add(If('comp_res')) \
+    .add(PutIntoBloom('mybloom', 'x')) \
+.EndIf() \
+.add(AssignConst('operation',ord('c')))\
+.add(Equals('comp_res', 'op', 'operation')) \
+.add(If('comp_res')) \
+    .add(MaybeContains('contains', 'mybloom', 'x')) \
+    .EndIf() \
 .add(SendBack())
 fs = FlowSelector(
         'IPV4_UDP',

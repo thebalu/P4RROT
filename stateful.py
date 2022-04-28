@@ -324,7 +324,7 @@ class MaybeContains(Command):
         self.salt_name = self.bloom_filter + '_salt'
         self.hashres_name = self.bloom_filter + '_result'
         self.env = env
-        self.result = result
+        self.result_var_name = result
         if env!=None:
             self.check()
 
@@ -335,18 +335,14 @@ class MaybeContains(Command):
         gc = GeneratedCode()
         properties = (self.env.get_varinfo(self.bloom_filter))['properties']
         val_to_check = self.env.get_varinfo(self.value)
-
+        self.result = self.env.get_varinfo(self.result_var_name)['handle']
         # start with True
         gc.get_apply().writeln('{} = {};'.format(self.result, '(bit<8>)1'))         
 
-        # this will be a parameter, how many hashes we want to calculate, now let's use fixed 4
         for i in range(properties['number_of_hashes']):
             gc.get_apply().writeln('hash({}, HashAlgorithm.crc16, (bit<32>) 0, '.format(self.hash_name) + '{' + \
                 '{}, (bit<8>) {}'.format(val_to_check['handle'], str(i)) + '}, (bit<32>)' +  '{});'.format(str(properties['capacity'])))
-        # concatenate instead of adding!
         # uid.get()
-        # Kivulrol, felhasznalo altal parameterben adott dolgoknal kell a get_varinfo
-        # code writer can indent stuff
             gc.get_apply().writeln('{}.read({}, {});'.format(self.reg_name, self.hashres_name, self.hash_name))
             gc.get_apply().writeln('if ({} != 1)'.format(self.hashres_name) + '{')
             gc.get_apply().increase_indent()
@@ -379,7 +375,6 @@ class PutIntoBloom(Command):
         val_to_check = self.env.get_varinfo(self.value)
         bloom_filter_var = self.env.get_varinfo(self.bloom_filter)        
 
-        # this will be a parameter, how many hashes we want to calculate, now let's use fixed 4
         for i in range(properties['number_of_hashes']):
             gc.get_apply().writeln('hash({}, HashAlgorithm.crc16, (bit<32>) 0, '.format(self.hash_name) + '{' + \
                 '{}, (bit<8>) {}'.format(val_to_check['handle'], str(i)) + '}, (bit<32>)' + '{});'.format(properties['capacity']))
